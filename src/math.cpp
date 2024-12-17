@@ -770,3 +770,14 @@ collides(AABB a, AABB b)
                   b.cen.z >= a_min.z && b.cen.z <= a_max.z);
     return result;
 }
+
+static b32
+is_in(v3 p, AABB aabb)
+{
+    v3 aabb_min = aabb.cen - aabb.dim * 0.5f;
+    v3 aabb_max = aabb.cen + aabb.dim * 0.5f;
+    b32 result = (p.x >= aabb_min.x && p.x <= aabb_max.x &&
+                  p.y >= aabb_min.y && p.y <= aabb_max.y &&
+                  p.z >= aabb_min.z && p.z <= aabb_max.z);
+    return result;
+}

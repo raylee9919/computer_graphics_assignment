@@ -8,6 +8,8 @@
    $Notice: (C) Copyright 2024 by Sung Woo Lee. All Rights Reserved. $
    ======================================================================== */
 
+#include <float.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stddef.h>
 

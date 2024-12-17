@@ -19,6 +19,8 @@
 #define INVALID_DEFAULT_CASE default: { ASSERT(!"InvalidDefaultCase"); } break;
 #define array_count(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 #define offset_of(STRUCT, MEMBER) (size_t)&(((STRUCT *)0)->MEMBER)
+#define MAX(a, b) (a > b ? a : b)
+#define MIN(a, b) (a > b ? b : a)
 
 #define RGBA_WHITE  V4(1.0f, 1.0f, 1.0f, 1.0f)
 #define RGBA_BLACK  V4(0.0f, 0.0f, 0.0f, 1.0f)
@@ -241,7 +243,7 @@ int main(void)
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        GLFWwindow *window = glfwCreateWindow(1280, 720, "12191642|SungWooLee", 0, 0);
+        GLFWwindow *window = glfwCreateWindow(1600, 900, "12191642|SungWooLee", 0, 0);
         if (window)
         {
             glfwMakeContextCurrent(window);
@@ -413,8 +415,41 @@ int main(void)
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
                     {
                         Wall wall = walls[idx];
-                        if (collides(wall.collision_volume, camera.collision_volume)) {
+                        if (collides(wall.collision_volume, camera.collision_volume)) 
+                        {
+                            AABB aabb = wall.collision_volume;
                             camera.position = prev_camera_pos;
+                            f32 t = FLT_MAX;
+                            v3 a[6] = {
+                                aabb.cen - aabb.dim * 0.5f,
+                                aabb.cen - aabb.dim * 0.5f,
+                                aabb.cen - aabb.dim * 0.5f,
+                                aabb.cen + aabb.dim * 0.5f,
+                                aabb.cen + aabb.dim * 0.5f,
+                                aabb.cen + aabb.dim * 0.5f,
+                            };
+                            v3 n[6] = {
+                                v3{ 0,-1, 0},
+                                v3{-1, 0, 0},
+                                v3{ 0, 0,-1},
+                                v3{ 0, 1, 0},
+                                v3{ 1, 0, 0},
+                                v3{ 0, 0, 1},
+                            };
+                            u32 normal_idx;
+                            for (u32 i = 0; i < 6; ++i)
+                            {
+                                t = MIN(safe_ratio(dot((a[i] - prev_camera_pos), n[i]), dot(dir, n[i])), t);
+                                v3 p = t * dir;
+                                if (is_in(p, aabb))
+                                {
+                                    normal_idx = i;
+                                }
+                            }
+
+                            v3 d = -dir;
+                            v3 r = 2.0f * dot(d, n[normal_idx]) * n[normal_idx] - d; 
+                            camera.position = t * dir + d;
                         }
                     }
 
