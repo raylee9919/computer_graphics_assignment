@@ -762,14 +762,11 @@ struct AABB
 inline b32
 collides(AABB a, AABB b)
 {
-    v3 a_min = a.cen - a.dim * 0.5f - b.dim;
-    v3 a_max = a.cen + a.dim * 0.5f + b.dim;
+    v3 a_min = a.cen - 0.5f * (a.dim + b.dim);
+    v3 a_max = a.cen + 0.5f * (a.dim + b.dim);
 
-    b32 result = (b.cen.x >= a_min.x &&
-                  b.cen.x <= a_max.x &&
-                  b.cen.y >= a_min.y &&
-                  b.cen.y <= a_max.y &&
-                  b.cen.z >= a_min.z &&
-                  b.cen.z <= a_max.z);
+    b32 result = (b.cen.x >= a_min.x && b.cen.x <= a_max.x &&
+                  b.cen.y >= a_min.y && b.cen.y <= a_max.y &&
+                  b.cen.z >= a_min.z && b.cen.z <= a_max.z);
     return result;
 }

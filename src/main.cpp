@@ -270,7 +270,7 @@ int main(void)
                 b32 should_close = false;
 
                 Camera camera;
-                init_camera(&camera, v3{0,0,0}, qt{1,0,0,0}, CameraTypePerspective, 0.5f, 0.5f, 500.0f, AABB{v3{0,0,0}, v3{1,1,1}});
+                init_camera(&camera, v3{0,0,0}, qt{1,0,0,0}, CameraTypePerspective, 0.5f, 0.5f, 500.0f, AABB{v3{0,0,0}, v3{2,2,2}});
 
                 Wall walls[5];
                 init_wall(&walls[0], v3{  0,-3,  0}, qt{1,0,0,0}, v3{2.2f,2.2f,2.2f});
@@ -383,7 +383,7 @@ int main(void)
                     prev_mouse_pos_x = input.mouse_pos.x;
                     prev_mouse_pos_y = input.mouse_pos.y;
 
-                    f32 speed = 8.0f;
+                    f32 speed = 10.0f;
                     v3 dir = v3{};
                     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
                         dir += (to_m4x4(camera.orientation) * V4(0,0,-1,1)).xyz;
@@ -407,14 +407,14 @@ int main(void)
 
                     // Update
                     update_camera(&camera, window_dim);
-
                     v3 prev_camera_pos = camera.position;
+
                     camera.position += dt * dir * speed;
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
                     {
                         Wall wall = walls[idx];
-                        if (!collides(wall.collision_volume, camera.collision_volume)) {
-                            v3 in = prev_camera_pos - wall.position;
+                        if (collides(wall.collision_volume, camera.collision_volume)) {
+                            camera.position = prev_camera_pos;
                         }
                     }
 
