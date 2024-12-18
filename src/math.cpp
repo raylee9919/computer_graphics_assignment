@@ -223,6 +223,20 @@ union v3
 };
 
 inline v3
+V3(f32 x, f32 y, f32 z)
+{
+    v3 v = v3{x,y,z};
+    return v;
+}
+
+inline v3
+V3(f32 a)
+{
+    v3 v = v3{a,a,a};
+    return v;
+}
+
+inline v3
 operator - (const v3 &in) 
 {
     v3 V;
@@ -733,13 +747,24 @@ to_m4x4(qt q)
     return result;
 }
 
+static m4x4
+scale(m4x4 m, v3 s) 
+{
+    m4x4 r = m;
+    r.e[0][0] *= s.x;
+    r.e[1][1] *= s.y;
+    r.e[2][2] *= s.z;
+
+    return r;
+}
+
 inline m4x4
-to_transform(v3 position, qt orientation)
+to_transform(v3 position, qt orientation, v3 scaling)
 {
     m4x4 T = translate(identity(), position);
     m4x4 R = to_m4x4(orientation);
-    // m4x4 S = scale(identity(), scaling);
-    m4x4 result = T * R;
+    m4x4 S = scale(identity(), scaling);
+    m4x4 result = T*R*S;
     return result;
 }
 
@@ -759,23 +784,12 @@ struct AABB
     v3 dim;
 };
 
-inline b32
-collides(AABB a, AABB b)
-{
-    v3 a_min = a.cen - 0.5f * (a.dim + b.dim);
-    v3 a_max = a.cen + 0.5f * (a.dim + b.dim);
-
-    b32 result = (b.cen.x >= a_min.x && b.cen.x <= a_max.x &&
-                  b.cen.y >= a_min.y && b.cen.y <= a_max.y &&
-                  b.cen.z >= a_min.z && b.cen.z <= a_max.z);
-    return result;
-}
-
 static b32
 is_in(v3 p, AABB aabb)
 {
-    v3 aabb_min = aabb.cen - aabb.dim * 0.5f;
-    v3 aabb_max = aabb.cen + aabb.dim * 0.5f;
+    f32 epsilon = 0.001f;
+    v3 aabb_min = aabb.cen - aabb.dim * 0.5f - V3(epsilon);
+    v3 aabb_max = aabb.cen + aabb.dim * 0.5f + V3(epsilon);
     b32 result = (p.x >= aabb_min.x && p.x <= aabb_max.x &&
                   p.y >= aabb_min.y && p.y <= aabb_max.y &&
                   p.z >= aabb_min.z && p.z <= aabb_max.z);

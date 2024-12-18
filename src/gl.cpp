@@ -14,6 +14,8 @@ struct Phong_Shader
     u32 M;
     u32 VP;
     u32 camera_pos;
+    u32 point_light_pos;
+    u32 point_light_color;
 };
 
 struct Line_Shader

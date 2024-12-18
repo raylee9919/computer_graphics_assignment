@@ -101,17 +101,20 @@ enum Render_Entity_Type
     RenderEntityTypeMesh,
     RenderEntityTypeAABB,
 };
+
 struct Render_Entity_Header
 {
     Render_Entity_Type type;
     size_t size;
 };
+
 struct Render_Entity_Mesh
 {
     Render_Entity_Header header;
     Mesh *mesh;
     m4x4 M;
 };
+
 struct Render_Entity_AABB
 {
     Render_Entity_Header header;
@@ -127,6 +130,7 @@ _push_render_entity(Memory_Arena *arena, Render_Entity_Type type, size_t size)
     header->size = size;
     return header;
 }
+
 static void
 push_mesh(Memory_Arena *arena, Mesh *mesh, m4x4 M)
 {
@@ -134,6 +138,7 @@ push_mesh(Memory_Arena *arena, Mesh *mesh, m4x4 M)
    data->mesh = mesh;
    data->M = M;
 }
+
 static void
 push_aabb(Memory_Arena *arena, AABB aabb)
 {
@@ -146,6 +151,7 @@ enum Camera_Type
     CameraTypePerspective,
     CameraTypeOrthographic,
 };
+
 struct Camera
 {
     v3 position;
@@ -162,6 +168,7 @@ struct Camera
 
     AABB collision_volume;
 };
+
 static void
 init_camera(Camera *camera, v3 _position, qt _orientation, Camera_Type _type, f32 _focal_length, f32 _N, f32 _F, AABB collision_volume)
 {
@@ -174,6 +181,7 @@ init_camera(Camera *camera, v3 _position, qt _orientation, Camera_Type _type, f3
 
     camera->collision_volume = collision_volume;
 }
+
 static void
 update_camera(Camera *camera, v2 dim)
 {
@@ -213,14 +221,17 @@ struct Wall
 {
     v3 position;
     qt orientation;
+    v3 scale;
     AABB collision_volume;
 };
+
 static void
-init_wall(Wall *wall, v3 _position, qt _orientation, v3 collision_volume_dim)
+init_wall(Wall *wall, v3 position, qt orientation, v3 scale, v3 collision_volume_dim)
 {
-    wall->position    = _position;
-    wall->orientation = _orientation;
-    wall->collision_volume.cen = _position;
+    wall->position    = position;
+    wall->orientation = orientation;
+    wall->scale       = scale;
+    wall->collision_volume.cen = position;
     wall->collision_volume.dim = collision_volume_dim;
 }
 
@@ -272,14 +283,21 @@ int main(void)
                 b32 should_close = false;
 
                 Camera camera;
-                init_camera(&camera, v3{0,0,0}, qt{1,0,0,0}, CameraTypePerspective, 0.5f, 0.5f, 500.0f, AABB{v3{0,0,0}, v3{2,2,2}});
+                init_camera(&camera, v3{0,0,0}, qt{1,0,0,0}, CameraTypePerspective, 0.5f, 0.5f, 1000.0f, AABB{v3{0,0,0}, V3(1.5f)});
+                v3 acceleration = v3{};
+                v3 velocity = v3{};
+                const f32 speed = 2.0f;
+                const f32 damping_factor = 0.1f;
 
                 Wall walls[5];
-                init_wall(&walls[0], v3{  0,-3,  0}, qt{1,0,0,0}, v3{2.2f,2.2f,2.2f});
-                init_wall(&walls[1], v3{-10, 0,  0}, qt{1,0,0,0}, v3{2.2f,2.2f,2.2f});
-                init_wall(&walls[2], v3{ 10, 0,  0}, qt{1,0,0,0}, v3{2.2f,2.2f,2.2f});
-                init_wall(&walls[3], v3{  0, 0,-10}, qt{1,0,0,0}, v3{2.2f,2.2f,2.2f});
-                init_wall(&walls[4], v3{  0, 0, 10}, qt{1,0,0,0}, v3{2.2f,2.2f,2.2f});
+                init_wall(&walls[0], V3(  0,-3,  0), qt{1,0,0,0}, V3(10.0f, 1.0f, 10.0f), V3(20.2f, 2.2f, 20.2f));
+                init_wall(&walls[1], V3(-10, 0,  0), qt{1,0,0,0}, V3(1.0f,  1.0f, 10.0f), V3(2.2f,  2.2f, 20.2f));
+                init_wall(&walls[2], V3( 10, 0,  0), qt{1,0,0,0}, V3(1.0f,  1.0f, 10.0f), V3(2.2f,  2.2f, 20.2f));
+                init_wall(&walls[3], V3(  0, 0,-10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(20.2f, 2.2f, 2.2f));
+                init_wall(&walls[4], V3(  0, 0, 10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(20.2f, 2.2f, 2.2f));
+
+                v3 point_light_pos   = V3(0, 3, 0);
+                v3 point_light_color = V3(1, 1, 1) * 20;
 
                 const char *shader_header = 
                     #include "shader/shader.header"
@@ -297,6 +315,8 @@ int main(void)
                 phong_shader.M = glGetUniformLocation(phong_shader.id, "M");
                 phong_shader.VP = glGetUniformLocation(phong_shader.id, "VP");
                 phong_shader.camera_pos = glGetUniformLocation(phong_shader.id, "camera_pos");
+                phong_shader.point_light_pos = glGetUniformLocation(phong_shader.id, "point_light_pos");
+                phong_shader.point_light_color = glGetUniformLocation(phong_shader.id, "point_light_color");
 
                 Line_Shader line_shader;
                 line_shader.id = gl_create_program(shader_header, line_vs, line_fs);
@@ -308,14 +328,14 @@ int main(void)
                 Mesh *cube_mesh = push_struct(&asset_arena, Mesh);
                 cube_mesh->vertex_count = 8;
                 cube_mesh->vertices = push_array(&asset_arena, Vertex, cube_mesh->vertex_count);
-                cube_mesh->vertices[0] = Vertex{v3{-1,-1, 1}, v3{ 0, 0,-1}, v2{}, V4(1,0,0,1)};
-                cube_mesh->vertices[1] = Vertex{v3{ 1,-1, 1}, v3{ 0, 0,-1}, v2{}, V4(0,1,0,1)};
-                cube_mesh->vertices[2] = Vertex{v3{ 1,-1,-1}, v3{ 0, 0,-1}, v2{}, V4(0,0,1,1)};
-                cube_mesh->vertices[3] = Vertex{v3{-1,-1,-1}, v3{ 0, 0,-1}, v2{}, V4(1,1,0,1)};
-                cube_mesh->vertices[4] = Vertex{v3{-1, 1, 1}, v3{ 0, 0,-1}, v2{}, V4(1,0,1,1)};
-                cube_mesh->vertices[5] = Vertex{v3{ 1, 1, 1}, v3{ 0, 0,-1}, v2{}, V4(0,1,1,1)};
-                cube_mesh->vertices[6] = Vertex{v3{ 1, 1,-1}, v3{ 0, 0,-1}, v2{}, V4(1,1,1,1)};
-                cube_mesh->vertices[7] = Vertex{v3{-1, 1,-1}, v3{ 0, 0,-1}, v2{}, V4(1,1,0,1)};
+                cube_mesh->vertices[0] = Vertex{v3{-1,-1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[1] = Vertex{v3{ 1,-1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[2] = Vertex{v3{ 1,-1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[3] = Vertex{v3{-1,-1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[4] = Vertex{v3{-1, 1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[5] = Vertex{v3{ 1, 1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[6] = Vertex{v3{ 1, 1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[7] = Vertex{v3{-1, 1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
                 u32 cube_indices[] = {
                     0,1,2, 0,2,3,
                     4,5,6, 4,6,7,
@@ -330,9 +350,9 @@ int main(void)
                     cube_mesh->indices[idx] = cube_indices[idx];
 
                 v2 window_dim = get_window_dimension(window);
-                f64 mouse_Px, mouse_Py;
-                glfwGetCursorPos(window, &mouse_Px, &mouse_Py);
-                input.mouse_pos = v2{(f32)mouse_Px, window_dim.y - (f32)mouse_Py};
+                f64 mouse_pos_x, mouse_pos_y;
+                glfwGetCursorPos(window, &mouse_pos_x, &mouse_pos_y);
+                input.mouse_pos = v2{(f32)mouse_pos_x, window_dim.y - (f32)mouse_pos_y};
                 f32 prev_mouse_pos_x = input.mouse_pos.x;
                 f32 prev_mouse_pos_y = input.mouse_pos.y;
 
@@ -355,11 +375,10 @@ int main(void)
                     window_dim = get_window_dimension(window);
 
                     // Get mouse info.
-                    glfwGetCursorPos(window, &mouse_Px, &mouse_Py);
-                    input.mouse_pos = v2{(f32)mouse_Px, window_dim.y - (f32)mouse_Py};
+                    glfwGetCursorPos(window, &mouse_pos_x, &mouse_pos_y);
+                    input.mouse_pos = v2{(f32)mouse_pos_x, window_dim.y - (f32)mouse_pos_y};
 
-                    s32 key_state;
-                    key_state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+                    s32 key_state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
                     if (key_state == GLFW_RELEASE) {
                         input.toggled[KeyMouseLeft] = (input.is_down[KeyMouseLeft]) ? 1 : 0;
                         input.is_down[KeyMouseLeft] = 0;
@@ -380,22 +399,27 @@ int main(void)
 
                     f32 dx = prev_mouse_pos_x - input.mouse_pos.x;
                     f32 dy = input.mouse_pos.y - prev_mouse_pos_y;
-                    camera.orientation = rotate(camera.orientation, v3{0,1,0}, dt * dx);
-                    camera.orientation = rotate(camera.orientation, rotate(v3{1,0,0}, camera.orientation), dt * dy);
+                    camera.orientation = rotate(camera.orientation, v3{0,1,0}, dt*dx);
+                    camera.orientation = rotate(camera.orientation, rotate(v3{1,0,0}, camera.orientation), dt*dy);
                     prev_mouse_pos_x = input.mouse_pos.x;
                     prev_mouse_pos_y = input.mouse_pos.y;
 
-                    f32 speed = 10.0f;
-                    v3 dir = v3{};
+                    v3 accel_dir = v3{};
                     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-                        dir += (to_m4x4(camera.orientation) * V4(0,0,-1,1)).xyz;
+                        accel_dir += (to_m4x4(camera.orientation) * V4(0,0,-1,1)).xyz;
                     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-                        dir += (to_m4x4(camera.orientation) * V4(0,0,1,1)).xyz;
+                        accel_dir += (to_m4x4(camera.orientation) * V4(0,0,1,1)).xyz;
                     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-                        dir += (to_m4x4(camera.orientation) * V4(-1,0,0,1)).xyz;
+                        accel_dir += (to_m4x4(camera.orientation) * V4(-1,0,0,1)).xyz;
                     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-                        dir += (to_m4x4(camera.orientation) * V4(1,0,0,1)).xyz;
-                    dir = noz(v3{dir.x, 0, dir.z});
+                        accel_dir += (to_m4x4(camera.orientation) * V4(1,0,0,1)).xyz;
+                    accel_dir = noz(v3{accel_dir.x, 0, accel_dir.z});
+
+                    acceleration = (accel_dir * speed);
+
+                    velocity += (acceleration * dt);
+
+                    v3 dir = noz(velocity);
 
                     if (toggled_down(&input, KeyTilde))
                     {
@@ -409,47 +433,45 @@ int main(void)
 
                     // Update
                     update_camera(&camera, window_dim);
-                    v3 prev_camera_pos = camera.position;
+                    v3 O = camera.position;
+                    camera.position += (velocity * dt);
 
-                    camera.position += dt * dir * speed;
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
                     {
                         Wall wall = walls[idx];
-                        if (collides(wall.collision_volume, camera.collision_volume)) 
+                        AABB aabb = wall.collision_volume;
+                        aabb.dim += camera.collision_volume.dim;
+                        if (is_in(camera.position, aabb)) 
                         {
-                            AABB aabb = wall.collision_volume;
-                            camera.position = prev_camera_pos;
                             f32 t = FLT_MAX;
-                            v3 a[6] = {
-                                aabb.cen - aabb.dim * 0.5f,
-                                aabb.cen - aabb.dim * 0.5f,
-                                aabb.cen - aabb.dim * 0.5f,
-                                aabb.cen + aabb.dim * 0.5f,
-                                aabb.cen + aabb.dim * 0.5f,
-                                aabb.cen + aabb.dim * 0.5f,
+
+                            v3 A[] = {
+                                aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f,
+                                aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f,
                             };
-                            v3 n[6] = {
-                                v3{ 0,-1, 0},
-                                v3{-1, 0, 0},
-                                v3{ 0, 0,-1},
-                                v3{ 0, 1, 0},
-                                v3{ 1, 0, 0},
-                                v3{ 0, 0, 1},
+                            v3 N[] = {
+                                v3{ 0,-1, 0}, v3{-1, 0, 0}, v3{ 0, 0,-1},
+                                v3{ 0, 1, 0}, v3{ 1, 0, 0}, v3{ 0, 0, 1},
                             };
-                            u32 normal_idx;
-                            for (u32 i = 0; i < 6; ++i)
+
+                            s32 normal_idx = -1;
+                            for (s32 i = 0; i < array_count(N); ++i)
                             {
-                                t = MIN(safe_ratio(dot((a[i] - prev_camera_pos), n[i]), dot(dir, n[i])), t);
-                                v3 p = t * dir;
-                                if (is_in(p, aabb))
+                                f32 new_t = safe_ratio( dot(A[i] - O, N[i]), dot(dir, N[i]) );
+                                v3 P = O + new_t * dir;
+                                if (is_in(P, aabb))
                                 {
+                                    t = MIN(t, new_t);
                                     normal_idx = i;
                                 }
                             }
 
-                            v3 d = -dir;
-                            v3 r = 2.0f * dot(d, n[normal_idx]) * n[normal_idx] - d; 
-                            camera.position = t * dir + d;
+                            if (normal_idx != -1)
+                            {
+                                v3 d = -t * dir;
+                                v3 n = N[normal_idx];
+                                camera.position = O + t * dir + -d + 2.0f * dot(d, n) * n;
+                            }
                         }
                     }
 
@@ -457,7 +479,7 @@ int main(void)
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
                     {
                         Wall *wall = walls + idx;
-                        push_mesh(&render_arena, cube_mesh, to_transform(wall->position, wall->orientation));
+                        push_mesh(&render_arena, cube_mesh, to_transform(wall->position, wall->orientation, wall->scale));
                         if (DEBUG_show_collision_volume)
                             push_aabb(&render_arena, wall->collision_volume);
                     }
@@ -493,9 +515,13 @@ int main(void)
                             {
                                 Render_Entity_Mesh *data = (Render_Entity_Mesh *)at;
 
+                                glEnable(GL_DEPTH_TEST);
+
                                 glUseProgram(phong_shader.id);
                                 glUniformMatrix4fv(phong_shader.VP, 1, GL_TRUE, &camera.VP.e[0][0]);
                                 glUniform3fv(phong_shader.camera_pos, 1, (GLfloat *)&camera.position);
+                                glUniform3fv(phong_shader.point_light_pos, 1, (GLfloat *)&point_light_pos);
+                                glUniform3fv(phong_shader.point_light_color, 1, (GLfloat *)&point_light_color);
 
                                 glUniformMatrix4fv(phong_shader.M, 1, GL_TRUE, &data->M.e[0][0]);
 
@@ -531,6 +557,8 @@ int main(void)
                             {
                                 Render_Entity_AABB *data = (Render_Entity_AABB *)at;
                                 AABB aabb = data->aabb;
+
+                                glDisable(GL_DEPTH_TEST);
 
                                 glUseProgram(line_shader.id);
                                 glUniformMatrix4fv(line_shader.VP, 1, GL_TRUE, &camera.VP.e[0][0]);
