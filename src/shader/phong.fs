@@ -22,10 +22,14 @@ void main()
     f32 attenuation = 1.0f / (LIGHT_ATTENUATION_CONSTANT +
                               LIGHT_ATTENUATION_LINEAR * d +
                               LIGHT_ATTENUATION_QUADRATIC * d * d);
-    v3 light = point_light_color * attenuation;
+    v3 dir = normalize(point_light_pos - fP);
+    f32 cos_falloff = max(0, dot(dir, fN));
+    f32 ambient = 0.05;
+    v3 light = point_light_color * attenuation * cos_falloff + point_light_color * ambient;
     color *= light;
+
     color = pow(color, v3(1.0/2.2));
-    result = v4(color * attenuation, 1);
+    result = v4(color, 1);
 }
 
 )";

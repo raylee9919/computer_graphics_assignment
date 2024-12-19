@@ -787,9 +787,8 @@ struct AABB
 static b32
 is_in(v3 p, AABB aabb)
 {
-    f32 epsilon = 0.001f;
-    v3 aabb_min = aabb.cen - aabb.dim * 0.5f - V3(epsilon);
-    v3 aabb_max = aabb.cen + aabb.dim * 0.5f + V3(epsilon);
+    v3 aabb_min = aabb.cen - aabb.dim * 0.5f - V3(epsilon_f32);
+    v3 aabb_max = aabb.cen + aabb.dim * 0.5f + V3(epsilon_f32);
     b32 result = (p.x >= aabb_min.x && p.x <= aabb_max.x &&
                   p.y >= aabb_min.y && p.y <= aabb_max.y &&
                   p.z >= aabb_min.z && p.z <= aabb_max.z);

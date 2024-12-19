@@ -284,20 +284,17 @@ int main(void)
 
                 Camera camera;
                 init_camera(&camera, v3{0,0,0}, qt{1,0,0,0}, CameraTypePerspective, 0.5f, 0.5f, 1000.0f, AABB{v3{0,0,0}, V3(1.5f)});
-                v3 acceleration = v3{};
-                v3 velocity = v3{};
                 const f32 speed = 2.0f;
-                const f32 damping_factor = 0.1f;
 
                 Wall walls[5];
-                init_wall(&walls[0], V3(  0,-3,  0), qt{1,0,0,0}, V3(10.0f, 1.0f, 10.0f), V3(20.2f, 2.2f, 20.2f));
-                init_wall(&walls[1], V3(-10, 0,  0), qt{1,0,0,0}, V3(1.0f,  1.0f, 10.0f), V3(2.2f,  2.2f, 20.2f));
-                init_wall(&walls[2], V3( 10, 0,  0), qt{1,0,0,0}, V3(1.0f,  1.0f, 10.0f), V3(2.2f,  2.2f, 20.2f));
-                init_wall(&walls[3], V3(  0, 0,-10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(20.2f, 2.2f, 2.2f));
-                init_wall(&walls[4], V3(  0, 0, 10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(20.2f, 2.2f, 2.2f));
+                init_wall(&walls[0], V3(  0,-2,  0), qt{1,0,0,0}, V3(10.0f, 1.0f, 10.0f), V3(18.0f, 2.0f, 18.0f));
+                init_wall(&walls[1], V3(-10, 0,  0), qt{1,0,0,0}, V3(1.0f,  1.0f, 10.0f), V3(2.0f,  2.0f, 18.0f));
+                init_wall(&walls[2], V3( 10, 0,  0), qt{1,0,0,0}, V3(1.0f,  1.0f, 10.0f), V3(2.0f,  2.0f, 18.0f));
+                init_wall(&walls[3], V3(  0, 0,-10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(18.0f, 2.0f, 2.0f));
+                init_wall(&walls[4], V3(  0, 0, 10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(18.0f, 2.0f, 2.0f));
 
                 v3 point_light_pos   = V3(0, 3, 0);
-                v3 point_light_color = V3(1, 1, 1) * 20;
+                v3 point_light_color = V3(1, 1, 1) * 2;
 
                 const char *shader_header = 
                     #include "shader/shader.header"
@@ -326,23 +323,44 @@ int main(void)
                 init_arena(&asset_arena, game_memory.permanent_memory, MB(16));
                 
                 Mesh *cube_mesh = push_struct(&asset_arena, Mesh);
-                cube_mesh->vertex_count = 8;
+                cube_mesh->vertex_count = 24;
                 cube_mesh->vertices = push_array(&asset_arena, Vertex, cube_mesh->vertex_count);
-                cube_mesh->vertices[0] = Vertex{v3{-1,-1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
-                cube_mesh->vertices[1] = Vertex{v3{ 1,-1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
-                cube_mesh->vertices[2] = Vertex{v3{ 1,-1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
-                cube_mesh->vertices[3] = Vertex{v3{-1,-1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
-                cube_mesh->vertices[4] = Vertex{v3{-1, 1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
-                cube_mesh->vertices[5] = Vertex{v3{ 1, 1, 1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
-                cube_mesh->vertices[6] = Vertex{v3{ 1, 1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
-                cube_mesh->vertices[7] = Vertex{v3{-1, 1,-1}, v3{ 0, 0,-1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[0]  = Vertex{v3{-1, -1,  1}, v3{ 0,  0,  1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[1]  = Vertex{v3{ 1, -1,  1}, v3{ 0,  0,  1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[2]  = Vertex{v3{ 1,  1,  1}, v3{ 0,  0,  1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[3]  = Vertex{v3{-1,  1,  1}, v3{ 0,  0,  1}, v2{}, RGBA_WHITE};
+
+                cube_mesh->vertices[4]  = Vertex{v3{ 1, -1, -1}, v3{ 0,  0, -1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[5]  = Vertex{v3{-1, -1, -1}, v3{ 0,  0, -1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[6]  = Vertex{v3{-1,  1, -1}, v3{ 0,  0, -1}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[7]  = Vertex{v3{ 1,  1, -1}, v3{ 0,  0, -1}, v2{}, RGBA_WHITE};
+
+                cube_mesh->vertices[8]  = Vertex{v3{-1, -1, -1}, v3{-1,  0,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[9]  = Vertex{v3{-1, -1,  1}, v3{-1,  0,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[10] = Vertex{v3{-1,  1,  1}, v3{-1,  0,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[11] = Vertex{v3{-1,  1, -1}, v3{-1,  0,  0}, v2{}, RGBA_WHITE};
+
+                cube_mesh->vertices[12] = Vertex{v3{ 1, -1,  1}, v3{ 1,  0,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[13] = Vertex{v3{ 1, -1, -1}, v3{ 1,  0,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[14] = Vertex{v3{ 1,  1, -1}, v3{ 1,  0,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[15] = Vertex{v3{ 1,  1,  1}, v3{ 1,  0,  0}, v2{}, RGBA_WHITE};
+
+                cube_mesh->vertices[16] = Vertex{v3{-1,  1,  1}, v3{ 0,  1,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[17] = Vertex{v3{ 1,  1,  1}, v3{ 0,  1,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[18] = Vertex{v3{ 1,  1, -1}, v3{ 0,  1,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[19] = Vertex{v3{-1,  1, -1}, v3{ 0,  1,  0}, v2{}, RGBA_WHITE};
+
+                cube_mesh->vertices[20] = Vertex{v3{-1, -1, -1}, v3{ 0, -1,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[21] = Vertex{v3{ 1, -1, -1}, v3{ 0, -1,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[22] = Vertex{v3{ 1, -1,  1}, v3{ 0, -1,  0}, v2{}, RGBA_WHITE};
+                cube_mesh->vertices[23] = Vertex{v3{-1, -1,  1}, v3{ 0, -1,  0}, v2{}, RGBA_WHITE};
                 u32 cube_indices[] = {
-                    0,1,2, 0,2,3,
-                    4,5,6, 4,6,7,
-                    0,1,5, 0,5,4,
-                    1,2,6, 1,6,5,
-                    2,3,7, 2,7,6,
-                    3,0,4, 3,4,7
+                    0, 1, 2,  0, 2, 3,
+                    4, 5, 6,  4, 6, 7,
+                    8, 9, 10, 8, 10,11,
+                    12,13,14, 12,14,15,
+                    16,17,18, 16,18,19,
+                    20,21,22, 20,22,23
                 };
                 cube_mesh->index_count = array_count(cube_indices);
                 cube_mesh->indices = push_array(&asset_arena, u32, cube_mesh->index_count);
@@ -404,22 +422,16 @@ int main(void)
                     prev_mouse_pos_x = input.mouse_pos.x;
                     prev_mouse_pos_y = input.mouse_pos.y;
 
-                    v3 accel_dir = v3{};
+                    v3 dir = v3{};
                     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-                        accel_dir += (to_m4x4(camera.orientation) * V4(0,0,-1,1)).xyz;
+                        dir += (to_m4x4(camera.orientation) * V4(0,0,-1,1)).xyz;
                     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-                        accel_dir += (to_m4x4(camera.orientation) * V4(0,0,1,1)).xyz;
+                        dir += (to_m4x4(camera.orientation) * V4(0,0,1,1)).xyz;
                     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-                        accel_dir += (to_m4x4(camera.orientation) * V4(-1,0,0,1)).xyz;
+                        dir += (to_m4x4(camera.orientation) * V4(-1,0,0,1)).xyz;
                     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-                        accel_dir += (to_m4x4(camera.orientation) * V4(1,0,0,1)).xyz;
-                    accel_dir = noz(v3{accel_dir.x, 0, accel_dir.z});
-
-                    acceleration = (accel_dir * speed);
-
-                    velocity += (acceleration * dt);
-
-                    v3 dir = noz(velocity);
+                        dir += (to_m4x4(camera.orientation) * V4(1,0,0,1)).xyz;
+                    dir = noz(v3{dir.x, 0, dir.z});
 
                     if (toggled_down(&input, KeyTilde))
                     {
@@ -433,9 +445,62 @@ int main(void)
 
                     // Update
                     update_camera(&camera, window_dim);
-                    v3 O = camera.position;
-                    camera.position += (velocity * dt);
 
+#if 0 // @NOTE: busted asf.
+                    f32 t_remaining = dt * speed;
+                    v3 original_pos = camera.position;
+                    v3 cur_pos = camera.position;
+                    v3 next_pos = cur_pos + t_remaining * dir;
+                    for (u32 test = 0;
+                         test < 4 && t_remaining > 0.001f;
+                         ++test)
+                    {
+                        for (u32 idx = 0; idx < array_count(walls); ++idx)
+                        {
+                            Wall wall = walls[idx];
+                            AABB aabb = wall.collision_volume;
+                            aabb.dim += camera.collision_volume.dim;
+                            if (is_in(next_pos, aabb)) 
+                            {
+                                v3 A[] = {
+                                    aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f,
+                                    aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f,
+                                };
+                                v3 N[] = {
+                                    v3{ 0,-1, 0}, v3{-1, 0, 0}, v3{ 0, 0,-1},
+                                    v3{ 0, 1, 0}, v3{ 1, 0, 0}, v3{ 0, 0, 1},
+                                };
+
+                                f32 t = FLT_MAX;
+                                s32 normal_idx = -1;
+                                for (s32 i = 0; i < array_count(N); ++i)
+                                {
+                                    f32 new_t = safe_ratio( dot(A[i] - cur_pos, N[i]), dot(dir, N[i]) );
+                                    v3 collision_pos = cur_pos + new_t * dir;
+                                    if (is_in(collision_pos, aabb))
+                                    {
+                                        t = MIN(t, new_t);
+                                        normal_idx = i;
+                                    }
+                                }
+                                ASSERT(t != FLT_MAX);
+                                t -= 0.001f;
+                                t_remaining -= t;
+                                ASSERT(t_remaining >= 0.0f);
+                                ASSERT(normal_idx != -1);
+
+                                v3 n = N[normal_idx];
+                                v3 tmp = (t - dt * speed) * dir;
+                                v3 reflect = -tmp + 2.0f * dot(n, tmp) * n;
+                                cur_pos += dir * t;
+                                next_pos = cur_pos + reflect;
+                            }
+                        }
+                    }
+                    camera.position = next_pos;
+#else
+                    v3 prev_pos = camera.position;
+                    camera.position += (dt * speed * dir);
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
                     {
                         Wall wall = walls[idx];
@@ -443,37 +508,11 @@ int main(void)
                         aabb.dim += camera.collision_volume.dim;
                         if (is_in(camera.position, aabb)) 
                         {
-                            f32 t = FLT_MAX;
-
-                            v3 A[] = {
-                                aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f,
-                                aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f,
-                            };
-                            v3 N[] = {
-                                v3{ 0,-1, 0}, v3{-1, 0, 0}, v3{ 0, 0,-1},
-                                v3{ 0, 1, 0}, v3{ 1, 0, 0}, v3{ 0, 0, 1},
-                            };
-
-                            s32 normal_idx = -1;
-                            for (s32 i = 0; i < array_count(N); ++i)
-                            {
-                                f32 new_t = safe_ratio( dot(A[i] - O, N[i]), dot(dir, N[i]) );
-                                v3 P = O + new_t * dir;
-                                if (is_in(P, aabb))
-                                {
-                                    t = MIN(t, new_t);
-                                    normal_idx = i;
-                                }
-                            }
-
-                            if (normal_idx != -1)
-                            {
-                                v3 d = -t * dir;
-                                v3 n = N[normal_idx];
-                                camera.position = O + t * dir + -d + 2.0f * dot(d, n) * n;
-                            }
+                            camera.position = prev_pos;
+                            break;
                         }
                     }
+#endif
 
                     // Draw
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
@@ -496,7 +535,7 @@ int main(void)
                     glCullFace(GL_BACK);
                     glFrontFace(GL_CCW);
 
-                    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+                    glClearColor(0.73f, 0.84f, 0.96f, 1.0f);
                     glClear(GL_COLOR_BUFFER_BIT);
 
                     glEnable(GL_DEPTH_TEST);
