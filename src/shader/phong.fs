@@ -22,10 +22,21 @@ void main()
     f32 attenuation = 1.0f / (LIGHT_ATTENUATION_CONSTANT +
                               LIGHT_ATTENUATION_LINEAR * d +
                               LIGHT_ATTENUATION_QUADRATIC * d * d);
+    v3 to_cam = normalize(camera_pos - fP);
     v3 dir = normalize(point_light_pos - fP);
+    v3 reflect_dir = reflect(dir, fN);
     f32 cos_falloff = max(0, dot(dir, fN));
-    f32 ambient = 0.05;
-    v3 light = point_light_color * attenuation * cos_falloff + point_light_color * ambient;
+    f32 specular = pow(max(0.0, dot(to_cam, reflect_dir)), 32);
+
+    f32 ambient = 0.1;
+    f32 diffuse_str = 0.5f;
+    f32 specular_str = 0.5f;
+
+    v3 ambient_light = point_light_color * ambient;
+    v3 diffuse_light = point_light_color * attenuation * diffuse_str * cos_falloff;
+    v3 specular_light = point_light_color * attenuation * specular_str * specular;
+
+    v3 light = ambient_light + diffuse_light + specular_light;
     color *= light;
 
     color = pow(color, v3(1.0/2.2));

@@ -18,6 +18,11 @@ struct Phong_Shader
     u32 point_light_color;
 };
 
+struct Bitmap_Shader
+{
+    u32 id;
+};
+
 struct Line_Shader
 {
     u32 id;

@@ -28,9 +28,11 @@
 #include "types.h"
 #include "memory.cpp"
 #include "math.cpp"
+#include "asset.cpp"
 #include "gl.cpp"
 
 b32 DEBUG_show_collision_volume;
+u32 global_next_bullet_idx = 0;
 
 struct Game_Memory 
 {
@@ -235,6 +237,69 @@ init_wall(Wall *wall, v3 position, qt orientation, v3 scale, v3 collision_volume
     wall->collision_volume.dim = collision_volume_dim;
 }
 
+struct Bullet
+{
+    v3 position;
+    qt orientation;
+
+    AABB collision_volume;
+
+    v3 accel;
+    v3 velocity;
+
+    f32 remain_lifetime;
+};
+
+static void
+init_bullet(Bullet *bullet, v3 position, qt orientation, v3 collision_volume_dim)
+{
+    bullet->position = position;
+    bullet->orientation = orientation;
+    bullet->collision_volume.cen = position;
+    bullet->collision_volume.dim = collision_volume_dim;
+
+    bullet->velocity = noz((to_m4x4(bullet->orientation) * V4(0,0,-1,1)).xyz) * 50.0f;
+    bullet->remain_lifetime = 10.0f;
+}
+
+static void
+update_bullet(Bullet *bullet, f32 dt)
+{
+    if (bullet->remain_lifetime > 0.0f)
+    {
+        bullet->accel = V3(0, -9.8f, 0);
+        bullet->velocity += dt * bullet->accel;
+        bullet->position += dt * bullet->velocity;
+        bullet->remain_lifetime -= dt;
+    }
+}
+
+static void
+gl_alloc_texture(Bitmap *bitmap, GLenum pname)
+{
+    glGenTextures(1, &bitmap->handle);
+    glBindTexture(GL_TEXTURE_2D, bitmap->handle);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, bitmap->width, bitmap->height,
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, bitmap->memory);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, pname);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, pname);
+}
+
+static void
+gl_bind_texture(Bitmap *bitmap)
+{
+    if (bitmap->handle) {
+        glBindTexture(GL_TEXTURE_2D, bitmap->handle);
+    } else {
+        gl_alloc_texture(bitmap, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, bitmap->handle);
+    }
+}
+
 int main(void)
 {
     Game_Memory game_memory = {};
@@ -242,7 +307,7 @@ int main(void)
     game_memory.transient_memory_size = MB(512);
     size_t total_capacity = (game_memory.permanent_memory_size + 
                              game_memory.transient_memory_size);
-    void *memory_base = VirtualAlloc(0, total_capacity, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    void *memory_base = malloc(total_capacity);
     game_memory.permanent_memory = memory_base;
     game_memory.transient_memory = (u8 *)game_memory.permanent_memory + game_memory.permanent_memory_size;
 
@@ -293,6 +358,10 @@ int main(void)
                 init_wall(&walls[3], V3(  0, 0,-10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(18.0f, 2.0f, 2.0f));
                 init_wall(&walls[4], V3(  0, 0, 10), qt{1,0,0,0}, V3(10.0f, 1.0f, 1.0f),  V3(18.0f, 2.0f, 2.0f));
 
+                Bullet bullets[256];
+                for (u32 idx = 0; idx < array_count(bullets); ++idx)
+                    bullets[idx] = Bullet{};
+
                 v3 point_light_pos   = V3(0, 3, 0);
                 v3 point_light_color = V3(1, 1, 1) * 2;
 
@@ -306,6 +375,10 @@ int main(void)
                     #include "shader/line.vs"
                 const char *line_fs = 
                     #include "shader/line.fs"
+                const char *bitmap_vs = 
+                    #include "shader/bitmap.vs"
+                const char *bitmap_fs = 
+                    #include "shader/bitmap.fs"
 
                 Phong_Shader phong_shader;
                 phong_shader.id = gl_create_program(shader_header, phong_vs, phong_fs);
@@ -318,6 +391,9 @@ int main(void)
                 Line_Shader line_shader;
                 line_shader.id = gl_create_program(shader_header, line_vs, line_fs);
                 line_shader.VP = glGetUniformLocation(line_shader.id, "VP"); 
+
+                Bitmap_Shader bitmap_shader;
+                bitmap_shader.id = gl_create_program(shader_header, bitmap_vs, bitmap_fs);
 
                 Memory_Arena asset_arena;
                 init_arena(&asset_arena, game_memory.permanent_memory, MB(16));
@@ -373,6 +449,8 @@ int main(void)
                 input.mouse_pos = v2{(f32)mouse_pos_x, window_dim.y - (f32)mouse_pos_y};
                 f32 prev_mouse_pos_x = input.mouse_pos.x;
                 f32 prev_mouse_pos_y = input.mouse_pos.y;
+
+                Bitmap *rifle_bitmap = load_bmp(&asset_arena, "rifle.bmp");
 
                 while (!should_close)
                 {
@@ -439,66 +517,26 @@ int main(void)
                         printf("[DEBUG] show_collision_volume: %d\n", DEBUG_show_collision_volume);
                     }
 
+                    if (toggled_down(&input, KeyMouseLeft))
+                    {
+                        Bullet *bullet = bullets + global_next_bullet_idx;
+                        global_next_bullet_idx = (global_next_bullet_idx + 1) % array_count(bullets);
+                        v3 offset = noz((to_m4x4(camera.orientation) * V4(1,-0.5f,0,1)).xyz) * 0.5f;
+                        init_bullet(bullet, camera.position + offset, camera.orientation, V3(1));
+                    }
+
                     //
                     // Simulate
                     //
 
                     // Update
                     update_camera(&camera, window_dim);
-
-#if 0 // @NOTE: busted asf.
-                    f32 t_remaining = dt * speed;
-                    v3 original_pos = camera.position;
-                    v3 cur_pos = camera.position;
-                    v3 next_pos = cur_pos + t_remaining * dir;
-                    for (u32 test = 0;
-                         test < 4 && t_remaining > 0.001f;
-                         ++test)
+                    for (u32 idx = 0; idx < array_count(bullets); ++idx)
                     {
-                        for (u32 idx = 0; idx < array_count(walls); ++idx)
-                        {
-                            Wall wall = walls[idx];
-                            AABB aabb = wall.collision_volume;
-                            aabb.dim += camera.collision_volume.dim;
-                            if (is_in(next_pos, aabb)) 
-                            {
-                                v3 A[] = {
-                                    aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f, aabb.cen - aabb.dim * 0.5f,
-                                    aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f, aabb.cen + aabb.dim * 0.5f,
-                                };
-                                v3 N[] = {
-                                    v3{ 0,-1, 0}, v3{-1, 0, 0}, v3{ 0, 0,-1},
-                                    v3{ 0, 1, 0}, v3{ 1, 0, 0}, v3{ 0, 0, 1},
-                                };
-
-                                f32 t = FLT_MAX;
-                                s32 normal_idx = -1;
-                                for (s32 i = 0; i < array_count(N); ++i)
-                                {
-                                    f32 new_t = safe_ratio( dot(A[i] - cur_pos, N[i]), dot(dir, N[i]) );
-                                    v3 collision_pos = cur_pos + new_t * dir;
-                                    if (is_in(collision_pos, aabb))
-                                    {
-                                        t = MIN(t, new_t);
-                                        normal_idx = i;
-                                    }
-                                }
-                                ASSERT(t != FLT_MAX);
-                                t -= 0.001f;
-                                t_remaining -= t;
-                                ASSERT(t_remaining >= 0.0f);
-                                ASSERT(normal_idx != -1);
-
-                                v3 n = N[normal_idx];
-                                v3 tmp = (t - dt * speed) * dir;
-                                v3 reflect = -tmp + 2.0f * dot(n, tmp) * n;
-                                cur_pos += dir * t;
-                                next_pos = cur_pos + reflect;
-                            }
-                        }
+                        Bullet *bullet = bullets + idx;
+                        update_bullet(bullet, dt);
                     }
-                    camera.position = next_pos;
-#else
+
                     v3 prev_pos = camera.position;
                     camera.position += (dt * speed * dir);
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
@@ -512,7 +550,6 @@ int main(void)
                             break;
                         }
                     }
-#endif
 
                     // Draw
                     for (u32 idx = 0; idx < array_count(walls); ++idx)
@@ -523,13 +560,22 @@ int main(void)
                             push_aabb(&render_arena, wall->collision_volume);
                     }
 
+                    for (u32 idx = 0; idx < array_count(bullets); ++idx)
+                    {
+                        Bullet *bullet = bullets + idx;
+                        if (bullet->remain_lifetime > 0.0f)
+                        {
+                            push_mesh(&render_arena, cube_mesh, to_transform(bullet->position, bullet->orientation, V3(1.0f)));
+                        }
+                    }
+
                     //
                     // Render
                     //
                     glViewport(0, 0, (u32)window_dim.x, (u32)window_dim.y);
 
                     glEnable(GL_BLEND);
-                    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                    glBlendFunc(GL_ONE, GL_ONE_MINUS_DST_ALPHA);
 
                     glEnable(GL_CULL_FACE);
                     glCullFace(GL_BACK);
@@ -635,6 +681,11 @@ int main(void)
 
                         at += header->size;
                     }
+
+                    // Gun Bitmap
+                    gl_bind_texture(rifle_bitmap);
+                    glUseProgram(bitmap_shader.id);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
                     glfwSwapBuffers(window);
                     glfwPollEvents();
