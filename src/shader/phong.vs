@@ -13,6 +13,8 @@ out v3 fN;
 out v2 fUV;
 out v4 fC;
 
+out v2 shadowmap_coord;
+
 void main()
 {
     m3x3 orientation = m3x3(M);
@@ -25,6 +27,8 @@ void main()
     fC  = vC;
 
     gl_Position = VP * result_pos;
+
+    shadowmap_coord = 
 }
 
 )";

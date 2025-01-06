@@ -693,6 +693,9 @@ int main(void)
                                 glEnable(GL_DEPTH_TEST);
 
                                 glUseProgram(phong_shader.id);
+
+                                glBindTexture(GL_TEXTURE_2D, shadowmap);
+
                                 glUniformMatrix4fv(phong_shader.VP, 1, GL_TRUE, &camera.VP.e[0][0]);
                                 glUniform3fv(phong_shader.camera_pos, 1, (GLfloat *)&camera.position);
                                 glUniform3fv(phong_shader.directional_light_dir, 1, (GLfloat *)&directional_light_dir);
